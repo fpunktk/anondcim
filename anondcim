@@ -1,56 +1,113 @@
-#!/bin/sh -e
+#!/bin/sh
 
-function die() { 
-    echo -e "$*" >&2
+# anondcim
+# forked from http://code.sotun.de/git/anondcim/
+
+die() { 
+    echo "$*" >&2
     exit 1
 }
 
-function r() {
-    echo $(($RANDOM % $1))
+err() { 
+    echo "$*" >&2
 }
 
-max=$#
+rand() {
+    # random number between 0 and $1 - 1
+    # read from urandom, sh interpretes numbers with leading 0 wrong, so prepend $1 which doesn't change the result
+    echo $(( $1$(tr -dc "0-9" < /dev/urandom | head -c $((${#1} + 1))) % $1 ))
+}
+
+[ $# -gt 0 ] || die "Usage: $0 [-p image_prefix] [-s destination_size (absolute or percentage)] [-d destination_directory] imagefile(s)"
+
+[ ! -x "$(which convert)" ] && die "ImageMagick (convert, identify) is not installed"
+[ ! -x "$(which jhead)" ] && [ ! -x "$(which exiftool)" ] && die "jhead or exiftool has to be installed"
+
+# set default values
+file_prefix=""
+dst_size="1280"
+dst_dir="--same--"
+
+while getopts ':p:s:d:' OPTION
+do
+    case $OPTION in
+        "p")
+            file_prefix="${OPTARG}_"
+        ;;
+        "s")
+            dst_size="$OPTARG"
+        ;;
+        "d")
+            # enforce a trailing "/"
+            [ -d "${OPTARG%/}/" ] && dst_dir="${OPTARG%/}/" || die "destination directory \"${OPTARG%/}/\" does not exist"
+        ;;
+        *)
+            err "not recognised: OPTION=$OPTION, OPTARG=$OPTARG"
+        ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
 cur=1
+total=$#
 
-[ $max -gt 0 ] || die "Usage:\n[IMG_PREFIX=your_prefix] $0 img1.jpg img2.jpg ..."
-[ -x "$(which convert)" ] || die "ImageMagick is not installed"
-[ -x "$(which jhead)" ] || die "jhead is not installed"
-
-while [ $# -gt 0 ]; do
-    dst="$IMG_PREFIX$(seq -w $cur $max|head -n1).jpg"
-    echo -e "[$((100*cur/max))%]\t$1\t-> $dst"
-
-    [ -f "$1" ] || die "$1 does not exist"
-    (! [ -e "$dst" ]) || die "$dst already exists"
-
-    read W H <<EOF
-        $(identify $1 |cut -f3 -d\ |tr x \ )
+for fn in "$@"
+do
+    if [ "$dst_dir" = "--same--" ]
+    then
+        # if the filename contains a "/" then use this dir
+        [ "$fn" != "${fn%/*}" ] && dst="${fn%/*}/" || dst=""
+    else
+        dst="$dst_dir"
+    fi
+    # always use a padded number as destination filename suffix
+    dst="$dst$file_prefix$(echo -n "0000000000$cur" | tail -c ${#total}).jpg"
+    echo "anonymizing \"$fn\" to \"$dst\" ($cur/$total)"
+    [ -f "$fn" ] || { err "source \"$fn\" does not exist and is skipped"; continue; }
+    [ -e "$dst" ] && { err "destination \"$dst\" for source \"$fn\" already exists, anonymization is skipped"; continue; }
+    
+    read w h << EOF
+$(identify -format '%w %h' "$fn")
 EOF
-
-    [ $W -ge 100 ] && [ $H -ge 100 ] || die "image is too small"
     
-    if [ $W -ge 1000 ]; then DW=$((W / 100)); else DW=10; fi
-    if [ $H -ge 1000 ]; then DH=$((H / 100)); else DH=10; fi
+    # resize and distort
+    if [ $w -ge 100 ] && [ $h -ge 100 ]
+    then
+        if [ $w -ge 1000 ]; then dw=$(($w / 100)); else dw=10; fi
+        if [ $h -ge 1000 ]; then dh=$(($h / 100)); else dh=10; fi
+        
+        w=$(($w - 1))
+        h=$(($h - 1))
+        
+        convert "$fn" \
+            -colorspace RGB \
+            -distort Perspective "$(rand $dw) $(rand $dh) 0 0, $(($w - $(rand $dw))) $(rand $dh) $w 0, $(rand $dw) $(($h - $(rand $dh))) 0 $h, $(($w - $(rand $dw))) $(($h - $(rand $dh))) $w $h" \
+            -filter gaussian -define filter:support=5 -define filter:sigma=0.5 \
+            -attenuate 2 +noise Uniform \
+            -resize "$dst_size" \
+            -colorspace sRGB \
+            "$dst"
+    else
+        err "image is too small to be distorted and will just be filtered and resized"
+        convert "$fn" \
+            -colorspace RGB \
+            -filter gaussian -define filter:support=5 -define filter:sigma=0.5 \
+            -attenuate 2 +noise Uniform \
+            -resize "$dst_size" \
+            -colorspace sRGB \
+            "$dst"
+    fi
     
-    W=$(($W-1))
-    H=$(($H-1))
-    
-    convert $1 \
-	-colorspace RGB \
-	-distort Perspective "$(
-        (   echo $(r $DW)           $(r $DH)           0  0
-	    echo $(($W - $(r $DW))) $(r $DH)           $W 0
-	    echo $(r $DW)           $(($H - $(r $DH))) 0  $H
-	    echo $(($W - $(r $DW))) $(($H - $(r $DH))) $W $H
-        ) | tr " \n" ", ")" \
-	-filter gaussian -define filter:support=5 -define filter:sigma=0.5 \
-	-attenuate 2 +noise Uniform \
-	-resize 50% \
-	-colorspace sRGB \
-	"$dst"
-
-    jhead -purejpg -q "$dst" || die "removing meta-data failed"
+    # remove metadata
+    if [ -x "$(which jhead)" ]
+    then
+        jhead -purejpg -q "$dst" || err "removing meta-data with jhead failed"
+    fi
+    if [ -x "$(which exiftool)" ]
+    then
+        exiftool -overwrite_original -all= "$dst" || err "removing meta-data with exiftool failed"
+    fi
 
     cur=$(($cur + 1))
-    shift
 done
+
