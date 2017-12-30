@@ -30,7 +30,7 @@ die() {
 rand() {
     # random number between 0 and $1 - 1
     # read from urandom, sh interpretes numbers with leading 0 wrong, so prepend $1 which doesn't change the result
-    echo $(( $1$(tr -dc "0-9" < /dev/urandom | head -c $((${#1} + 1))) % $1 ))
+    echo $(( $1$(tr -dc "0-9" < /dev/urandom | head -c $((${#1} + 2))) % $1 ))
 }
 
 [ $# -gt 0 ] || die "Usage: $0 [-p image_prefix] [-s destination_size (absolute or percentage)] [-d destination_directory] imagefile(s)"
