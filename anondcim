@@ -40,7 +40,7 @@ type jhead 1>/dev/null 2>&1 || type exiftool 1>/dev/null 2>&1 || die "jhead or e
 
 # set default values
 file_prefix=""
-dst_size="1280"
+dst_size="1920"
 dst_dir="--same--"
 
 while getopts ':p:s:d:' OPTION
