@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 # anondcim
 # forked from http://code.sotun.de/git/anondcim/
