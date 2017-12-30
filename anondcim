@@ -93,16 +93,16 @@ do
     read w h << EOF
 $(identify -format '%w %h' "$fn")
 EOF
-    
+    #
     # resize and distort
     if [ $w -ge 100 ] && [ $h -ge 100 ]
     then
         if [ $w -ge 1000 ]; then dw=$(($w / 100)); else dw=10; fi
         if [ $h -ge 1000 ]; then dh=$(($h / 100)); else dh=10; fi
-        
+        #
         w=$(($w - 1))
         h=$(($h - 1))
-        
+        #
         convert "$fn" \
             -colorspace RGB \
             -distort Perspective "$(rand $dw) $(rand $dh) 0 0, $(($w - $(rand $dw))) $(rand $dh) $w 0, $(rand $dw) $(($h - $(rand $dh))) 0 $h, $(($w - $(rand $dw))) $(($h - $(rand $dh))) $w $h" \
@@ -110,7 +110,7 @@ EOF
             -attenuate 2 +noise Uniform \
             -resize "$dst_size" \
             -colorspace sRGB \
-            "$dst"
+            "$dst_jpg"
     else
         err "image is too small to be distorted and will just be filtered and resized"
         convert "$fn" \
@@ -119,19 +119,19 @@ EOF
             -attenuate 2 +noise Uniform \
             -resize "$dst_size" \
             -colorspace sRGB \
-            "$dst"
+            "$dst_jpg"
     fi
-    
+    #
     # remove metadata
     if [ -x "$(which jhead)" ]
     then
-        jhead -purejpg -q "$dst" || err "removing meta-data with jhead failed"
+        jhead -purejpg -q "$dst_jpg" || err "removing meta-data with jhead failed"
     fi
     if [ -x "$(which exiftool)" ]
     then
-        exiftool -overwrite_original -all= "$dst" || err "removing meta-data with exiftool failed"
+        exiftool -quiet -overwrite_original -all= "$dst_jpg" || err "removing meta-data with exiftool failed"
     fi
-
+    #
     cur=$(($cur + 1))
 done
 
