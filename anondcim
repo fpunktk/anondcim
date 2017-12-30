@@ -35,8 +35,8 @@ rand() {
 
 [ $# -gt 0 ] || die "Usage: $0 [-p image_prefix] [-s destination_size (absolute or percentage)] [-d destination_directory] imagefile(s)"
 
-[ ! -x "$(which convert)" ] && die "ImageMagick (convert, identify) is not installed"
-[ ! -x "$(which jhead)" ] && [ ! -x "$(which exiftool)" ] && die "jhead or exiftool has to be installed"
+type convert >/dev/null 2>&1 || die "ImageMagick (convert, identify) is not installed"
+type jhead 1>/dev/null 2>&1 || type exiftool 1>/dev/null 2>&1 || die "jhead or exiftool has to be installed"
 
 # set default values
 file_prefix=""
