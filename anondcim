@@ -53,8 +53,8 @@ do
             dst_size="$OPTARG"
         ;;
         "d")
-            # enforce a trailing "/"
-            [ -d "${OPTARG%/}/" ] && dst_dir="${OPTARG%/}/" || die "destination directory \"${OPTARG%/}/\" does not exist"
+            dst_dir="${OPTARG%/}/" # enforce a trailing "/"
+            [ -d "$dst_dir" ] || die "destination directory \"$dst_dir\" does not exist"
         ;;
         *)
             err "not recognised: OPTION=$OPTION, OPTARG=$OPTARG"
