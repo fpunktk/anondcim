@@ -65,9 +65,12 @@ shift $(($OPTIND - 1))
 
 cur=1
 total=$#
+addend=1
 
 for fn in "$@"
 do
+    [ -f "$fn" ] || { err "source \"$fn\" does not exist and is skipped"; continue; }
+    #
     if [ "$dst_dir" = "--same--" ]
     then
         # if the filename contains a "/" then use this dir
@@ -76,11 +79,16 @@ do
         dst="$dst_dir"
     fi
     # always use a padded number as destination filename suffix
-    dst="$dst$file_prefix$(echo -n "0000000000$cur" | tail -c ${#total}).jpg"
-    echo "anonymizing \"$fn\" to \"$dst\" ($cur/$total)"
-    [ -f "$fn" ] || { err "source \"$fn\" does not exist and is skipped"; continue; }
-    [ -e "$dst" ] && { err "destination \"$dst\" for source \"$fn\" already exists, anonymization is skipped"; continue; }
-    
+    dst_jpg="$dst$file_prefix$(echo -n "0000000000$cur" | tail -c ${#total}).jpg"
+    while [ -e "$dst_jpg" ] && [ $addend -lt 1000 ]
+    do
+        dst_jpg="$dst$file_prefix$(echo -n "0000000000$(($cur + $addend))" | tail -c ${#total}).jpg"
+        addend=$((addend + 1))
+    done
+    [ -e "$dst_jpg" ] && { err "destination \"$dst_jpg\" for source \"$fn\" already exists, anonymization is skipped"; continue; }
+    #
+    echo "anonymizing \"$fn\" to \"$dst_jpg\" ($cur/$total)"
+    #
     read w h << EOF
 $(identify -format '%w %h' "$fn")
 EOF
