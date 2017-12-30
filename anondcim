@@ -73,11 +73,12 @@ do
     #
     if [ "$dst_dir" = "--same--" ]
     then
-        # if the filename contains a "/" then use this dir
-        [ "$fn" != "${fn%/*}" ] && dst="${fn%/*}/" || dst=""
+        # use the directory of the source file
+        dst="$(dirname "$fn")/"
     else
         dst="$dst_dir"
     fi
+    #
     # always use a padded number as destination filename suffix
     dst_jpg="$dst$file_prefix$(echo -n "0000000000$cur" | tail -c ${#total}).jpg"
     while [ -e "$dst_jpg" ] && [ $addend -lt 1000 ]
