@@ -33,8 +33,6 @@ rand() {
     echo $(( $1$(tr -dc "0-9" < /dev/urandom | head -c $((${#1} + 2))) % $1 ))
 }
 
-[ $# -gt 0 ] || die "Usage: $0 [-p image_prefix] [-s destination_size (absolute or percentage)] [-d destination_directory] imagefile(s)"
-
 type convert >/dev/null 2>&1 || die "ImageMagick (convert, identify) is not installed"
 type jhead 1>/dev/null 2>&1 || type exiftool 1>/dev/null 2>&1 || die "jhead or exiftool has to be installed"
 
@@ -42,8 +40,11 @@ type jhead 1>/dev/null 2>&1 || type exiftool 1>/dev/null 2>&1 || die "jhead or e
 file_prefix=""
 dst_size="1920"
 dst_dir="--same--"
+jpg_quality="75"
 
-while getopts ':p:s:d:' OPTION
+[ $# -gt 0 ] || die "Usage: $0 [-p image_file_prefix] [-s destination_size (absolute or percentage, default: $dst_size)] [-d destination_directory] [-q destination_jpg_quality (default: $jpg_quality)] imagefile(s)"
+
+while getopts ':p:s:d:q:' OPTION
 do
     case $OPTION in
         "p")
@@ -55,6 +56,9 @@ do
         "d")
             dst_dir="${OPTARG%/}/" # enforce a trailing "/"
             [ -d "$dst_dir" ] || die "destination directory \"$dst_dir\" does not exist"
+        ;;
+        "q")
+            jpg_quality="$OPTARG"
         ;;
         *)
             err "not recognised: OPTION=$OPTION, OPTARG=$OPTARG"
@@ -110,6 +114,7 @@ EOF
             -attenuate 2 +noise Uniform \
             -resize "$dst_size" \
             -colorspace sRGB \
+            -quality "$jpg_quality" \
             "$dst_jpg"
     else
         err "image is too small to be distorted and will just be filtered and resized"
@@ -119,6 +124,7 @@ EOF
             -attenuate 2 +noise Uniform \
             -resize "$dst_size" \
             -colorspace sRGB \
+            -quality "$jpg_quality" \
             "$dst_jpg"
     fi
     #
